@@ -6,19 +6,14 @@ from skimage.filters import threshold_otsu
 from torch import nn
 from torchvision import transforms
 
-def read_image(path, focus_frame_idx, num_channels=7):
+
+def read_image(path):
     image = Image.open(path)
+    num_channels = image.n_frames
     img_arr = []
 
-    for chan_idx in range(
-        focus_frame_idx - num_channels // 2,
-        focus_frame_idx + num_channels // 2 + num_channels % 2,
-    ):
-        try:
-            image.seek(chan_idx)
-        except:
-            assert 0, f"Input image does not have {chan_idx} channel"
-
+    for chan_idx in range(0, num_channels):
+        image.seek(chan_idx)
         imarray_idx = np.array(image)
         img_arr.append(imarray_idx)
 
@@ -35,16 +30,33 @@ class AllInOneModel(nn.Module):
         self.device = device
         self.model = torch.jit.load(weight_path).to(device)
 
-    def forward(self, image): # 1xCxHxW
-        image = image.cpu().data.numpy()
-        image = self.image_preprocessing(image[0])
-        image = torch.Tensor(image[None]).float()
+    def forward(self, image, focus_frame_idx):  # BxCxHxW
+        input = []
+        for i in range(len(image)):
+            cur_image = image[i].cpu().data.numpy()
+            cur_image = self.filter_channels(cur_image, focus_frame_idx[i])
+            cur_image = self.image_preprocessing(cur_image)
+            input.append(cur_image)
+        input = np.stack(input, axis=0)
+        input = torch.Tensor(input).float()
 
-        pred_mask = self.tta(self.model, image.to(self.device))
-        pred_mask = pred_mask[0][0].data.cpu().numpy()
-        pred_mask = self.prediction_postprocessing(pred_mask)
+        result = []
+        pred_mask = self.tta(self.model, input.to(self.device))
+        for i in range(pred_mask.shape[0]):
+            cur_pred = pred_mask[i][0].data.cpu().numpy()
+            cur_pred = self.prediction_postprocessing(cur_pred)
+            result.append(cur_pred[None])
 
-        return pred_mask
+        result = np.stack(result, axis=0)
+        return result
+
+    def filter_channels(self, image, focus_frame_idx):
+        return image[
+            focus_frame_idx
+            - self.num_channels // 2 : focus_frame_idx
+            + self.num_channels // 2
+            + self.num_channels % 2
+        ]
 
     def image_preprocessing(self, image):
         for idx in range(image.shape[0]):
