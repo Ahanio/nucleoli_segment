@@ -6,6 +6,27 @@ from skimage.filters import threshold_otsu
 from torch import nn
 from torchvision import transforms
 
+def read_image(path, focus_frame_idx, num_channels=7):
+    image = Image.open(path)
+    img_arr = []
+
+    for chan_idx in range(
+        focus_frame_idx - num_channels // 2,
+        focus_frame_idx + num_channels // 2 + num_channels % 2,
+    ):
+        try:
+            image.seek(chan_idx)
+        except:
+            assert 0, f"Input image does not have {chan_idx} channel"
+
+        imarray_idx = np.array(image)
+        img_arr.append(imarray_idx)
+
+    image = np.stack(img_arr, axis=0).astype("float32")
+    image = image.transpose((1, 2, 0))
+    image = transforms.ToTensor()(np.ascontiguousarray(image))
+    return image[None]
+
 
 class AllInOneModel(nn.Module):
     def __init__(self, weight_path, device="cpu"):
@@ -14,29 +35,10 @@ class AllInOneModel(nn.Module):
         self.device = device
         self.model = torch.jit.load(weight_path).to(device)
 
-    def proc_img(self, image, focus_frame_idx):
-        img_arr = []
-
-        for chan_idx in range(
-            focus_frame_idx - self.num_channels // 2,
-            focus_frame_idx + self.num_channels // 2 + self.num_channels % 2,
-        ):
-            try:
-                image.seek(chan_idx)
-            except:
-                assert 0, f"Input image does not have {chan_idx} channel"
-
-            imarray_idx = np.array(image)
-            img_arr.append(imarray_idx)
-
-        image = np.stack(img_arr, axis=0).astype("float32")
-        image = self.image_preprocessing(image)
-        image = transforms.ToTensor()(np.ascontiguousarray(image))
-        return image[None]
-
-    def forward(self, img_path, focus_frame_idx):
-        image = Image.open(img_path)
-        image = self.proc_img(image, focus_frame_idx)
+    def forward(self, image): # 1xCxHxW
+        image = image.cpu().data.numpy()
+        image = self.image_preprocessing(image[0])
+        image = torch.Tensor(image[None]).float()
 
         pred_mask = self.tta(self.model, image.to(self.device))
         pred_mask = pred_mask[0][0].data.cpu().numpy()
@@ -47,8 +49,6 @@ class AllInOneModel(nn.Module):
     def image_preprocessing(self, image):
         for idx in range(image.shape[0]):
             image[idx] = self.normalize_img(image[idx])
-
-        image = image.transpose((1, 2, 0))
         return image
 
     def prediction_postprocessing(self, all_pred):
