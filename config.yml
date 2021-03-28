@@ -4,17 +4,16 @@ name: Nucleoli Segmentation
 description: todo
 authors: todo
 
-# we allow for multiple citations. Each citation contains TEXT, DOI and URL. One of DOI or URL needs to be given.
 cite: todo
 
-git_repo: 
+git_repo: https://github.com/Ahanio/nucleoli_segment
 tags: [unet2d, pytorch, nucleoli, segmentation]
 license: MIT
 
 documentation: todo
-covers: []  # todo unet 2d arch image
+covers: todo # todo unet 2d arch image
 attachments: {}
-timestamp: 2020-01-28T12:22:32Z  # ISO 8601
+timestamp: 2021-03-22T12:22:32Z  # ISO 8601
 
 inputs:
   - name: raw
@@ -22,30 +21,26 @@ inputs:
     axes: bcyx  # letters of axes in btczyx
     data_type: float32
     data_range: [-inf, inf]
-    shape: [1, 7, 512, 512]
+    shape: [1, 96, 512, 512]
 
 outputs:
   - name: mask
-    description: probability in [0,1]
+    description: predict in [0,1]
     axes: bcyx
     data_type: float32
     data_range: [0, 1]
-    halo: [0, 0, 32, 32]
     shape: [1, 1, 512, 512]
 
 language: python
 framework: pytorch
-source: todo #pybio.torch.models.unet2d.UNet2d
+source: ./all_in_one.py:AllInOneModel
+kwargs: {focus_frame_idx: 41} 
 dependencies: conda:./environment_droplet.yml
 
-# test_inputs: [test_input.npy]
-# test_outputs: [test_output.npy]
+test_inputs: [./test_input.npy]
+test_outputs: [./test_output.npy]
 
-# sample_inputs: [sample_input.npy]
-# sample_outputs: [sample_output.npy]
-
-weights: todo
-#  pytorch_state_dict:
-#    authors: [Constantin Pape;@bioimage-io]
-#    sha256: e4d3885bccbe41cbf6c1d825f3cd2b707c7021ead5593156007e407a16b27cf2
-#    source: https://zenodo.org/record/3446812/files/unet2d_weights.torch
+weights: 
+  pytorch_script:
+    sha256: 80be9abec30c4b7219999516247740c16422ef9f975aea1d760c9d18b87597c0
+    source: https://www.dropbox.com/s/c7kb86s55lyidfv/nucleoli_weights.tar?dl=0 #./weights/nucleoli_weights.tar  

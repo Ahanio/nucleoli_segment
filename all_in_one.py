@@ -6,48 +6,38 @@ from skimage.filters import threshold_otsu
 from torch import nn
 from torchvision import transforms
 
-
-def read_image(path):
-    image = Image.open(path)
-    num_channels = image.n_frames
-    img_arr = []
-
-    for chan_idx in range(0, num_channels):
-        image.seek(chan_idx)
-        imarray_idx = np.array(image)
-        img_arr.append(imarray_idx)
-
-    image = np.stack(img_arr, axis=0).astype("float32")
-    image = image.transpose((1, 2, 0))
-    image = transforms.ToTensor()(np.ascontiguousarray(image))
-    return image[None]
+import inferno
+from inferno.extensions.layers import ConvReLU2D
+from inferno.extensions import model as inf_model
 
 
 class AllInOneModel(nn.Module):
-    def __init__(self, weight_path, device="cpu"):
+    def __init__(self, focus_frame_idx):
         super(AllInOneModel, self).__init__()
         self.num_channels = 7
-        self.device = device
-        self.model = torch.jit.load(weight_path).to(device)
+        self.model = build_standart_model(self.num_channels, 1, no_sigm=False)
+        self.model.eval()
+        self.focus_frame_idx = focus_frame_idx
 
-    def forward(self, image, focus_frame_idx):  # BxCxHxW
+    def forward(self, image):  # BxCxHxW
         input = []
         for i in range(len(image)):
             cur_image = image[i].cpu().data.numpy()
-            cur_image = self.filter_channels(cur_image, focus_frame_idx[i])
+            cur_image = self.filter_channels(cur_image, self.focus_frame_idx) #[i]
             cur_image = self.image_preprocessing(cur_image)
             input.append(cur_image)
         input = np.stack(input, axis=0)
         input = torch.Tensor(input).float()
 
         result = []
-        pred_mask = self.tta(self.model, input.to(self.device))
+        pred_mask = self.tta(self.model, input.to(next(self.model.parameters()).device))
         for i in range(pred_mask.shape[0]):
             cur_pred = pred_mask[i][0].data.cpu().numpy()
             cur_pred = self.prediction_postprocessing(cur_pred)
             result.append(cur_pred[None])
 
         result = np.stack(result, axis=0)
+        result = torch.Tensor(result).float()
         return result
 
     def filter_channels(self, image, focus_frame_idx):
@@ -147,3 +137,15 @@ class AllInOneModel(nn.Module):
 
     def torch_transpose2(self, x):
         return x.transpose(3, 2)
+
+
+def build_standart_model(image_channels, pred_channels=1, no_sigm=False):
+    if no_sigm:
+        return torch.nn.Sequential(
+            inf_model.ResBlockUNet(dim=2, in_channels=image_channels, out_channels=pred_channels, activated=False),
+        )
+    else:
+        return torch.nn.Sequential(
+            inf_model.ResBlockUNet(dim=2, in_channels=image_channels, out_channels=pred_channels, activated=False),
+            torch.nn.Sigmoid()
+        )
