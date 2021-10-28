@@ -1,14 +1,9 @@
 import numpy as np
 import torch
-from PIL import Image
+from inferno.extensions import model as inf_model
 from skimage import exposure, morphology
 from skimage.filters import threshold_otsu
 from torch import nn
-from torchvision import transforms
-
-import inferno
-from inferno.extensions.layers import ConvReLU2D
-from inferno.extensions import model as inf_model
 
 
 class AllInOneModel(nn.Module):

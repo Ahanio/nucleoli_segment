@@ -10,7 +10,7 @@ git_repo: https://github.com/Ahanio/nucleoli_segment
 tags: [unet2d, pytorch, nucleoli, segmentation]
 license: MIT
 
-documentation: todo
+documentation: README.md
 covers: todo # todo unet 2d arch image
 attachments: {}
 timestamp: 2021-03-22T12:22:32Z  # ISO 8601
@@ -43,4 +43,4 @@ test_outputs: [./test_output.npy]
 weights: 
   pytorch_script:
     sha256: 80be9abec30c4b7219999516247740c16422ef9f975aea1d760c9d18b87597c0
-    source: https://www.dropbox.com/s/c7kb86s55lyidfv/nucleoli_weights.tar?dl=0 #./weights/nucleoli_weights.tar  
+    source: nucleoli_weights.tar
